@@ -1,0 +1,5 @@
+- id: check-fortran-indentation
+  name: check Fortran indentation
+  description: checks whether Fortran code is indented correctly
+  entry: check-fortran-indentation
+  language: python
