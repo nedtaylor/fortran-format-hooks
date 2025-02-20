@@ -362,13 +362,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
-    success = 1
+    success = 0
     for filename in args.filenames:
         ## only apply if .f90 or .F90 file
         if not filename.endswith('.f90') and not filename.endswith('.F90'):
             continue
         if not check_indentation(filename):
-            success = 0
+            success = 1
         else:
             print(f"{filename} passed indentation check.")
     return success
