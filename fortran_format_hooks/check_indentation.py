@@ -3,6 +3,7 @@ import re
 import sys
 import glob
 import argparse
+from collections.abc import Sequence
 
 
 def check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
