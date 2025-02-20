@@ -1,3 +1,4 @@
+# developed following guide: https://dev.to/jalvaradosegura/create-your-own-pre-commit-hook-3kh
 - id: check-fortran-indentation
   name: check Fortran indentation
   description: checks whether Fortran code is indented correctly
