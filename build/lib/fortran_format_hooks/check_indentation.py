@@ -363,6 +363,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     success = 1
     for filename in args.filenames:
+        ## only apply if .f90 or .F90 file
+        if not filename.endswith('.f90') and not filename.endswith('.F90'):
+            continue
         if not check_indentation(filename):
             success = 0
         else:
