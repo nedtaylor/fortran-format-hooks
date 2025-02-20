@@ -5,7 +5,14 @@ import glob
 import argparse
 from collections.abc import Sequence
 
+## Attribution statement:
+##  Some of the functionality in this file is based on the pre-commit/pre-commit-hooks repository
+##  https://github.com/pre-commit/pre-commit-hooks/blob/main/pre_commit_hooks
 
+
+# Function to fix the indentation of the file
+# Copied from pre-commit/pre-commit-hooks repository
+# https://github.com/pre-commit/pre-commit-hooks/blob/main/pre_commit_hooks/pretty_format_json.py
 def _autofix(filename: str, new_contents: str) -> None:
     print(f'Fixing file {filename}')
     with open(filename, 'w', encoding='UTF-8') as f:
