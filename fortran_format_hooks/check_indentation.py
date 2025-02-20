@@ -19,7 +19,7 @@ def check_if_match(actual_indent, expected_indent, continued_indent, continuatio
             return False
     return True
 
-def check_indentation(file_path):
+def check_indentation(file_path, line_length=80):
     procedure_indent = 2
     module_program_indent = 2
     loop_conditional_indent = 3
@@ -53,9 +53,16 @@ def check_indentation(file_path):
     with open(file_path, 'r') as file:
         for line_num, line in enumerate(file, start=1):
             
+            
+
+            # Be more relaxed with comment lines regarding line length (using PEP8, flake8-bugbear, B950)
+            # https://stackoverflow.com/questions/46863890/does-pythons-pep8-line-length-limit-apply-to-comments
+            if re.match(r'^!', line):
+                if len(line) > line_length + 1 + 0.1 * line_length:
+                    print(f"Comment Line {line_num} in {file_path} exceeds {line_length} characters: {len(line)}")
             # check length of line does not exceed
-            if len(line) > 81:
-                print(f"Line {line_num} in {file_path} exceeds 80 characters: {len(line)}")
+            elif len(line) > line_length + 1:
+                print(f"Line {line_num} in {file_path} exceeds {line_length} characters: {len(line)}")
                 success = False
 
             stripped_line = line.rstrip()
@@ -360,6 +367,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         'filenames', nargs='*',
         help='Filenames pre-commit believes are changed.',
     )
+    parser.add_argument(
+        '--line-length', type=int, default=80,
+        help='Maximum line length.',
+    )
     args = parser.parse_args(argv)
 
     success = 0
@@ -367,7 +378,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         ## only apply if .f90 or .F90 file
         if not filename.endswith('.f90') and not filename.endswith('.F90'):
             continue
-        if not check_indentation(filename):
+        if not check_indentation(filename, args.line_length):
             success = 1
         else:
             print(f"{filename} passed indentation check.")
