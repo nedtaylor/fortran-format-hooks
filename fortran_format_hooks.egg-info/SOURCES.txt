@@ -1,9 +1,0 @@
-setup.cfg
-setup.py
-fortran_format_hooks/__init__.py
-fortran_format_hooks/check_indentation.py
-fortran_format_hooks.egg-info/PKG-INFO
-fortran_format_hooks.egg-info/SOURCES.txt
-fortran_format_hooks.egg-info/dependency_links.txt
-fortran_format_hooks.egg-info/entry_points.txt
-fortran_format_hooks.egg-info/top_level.txt
