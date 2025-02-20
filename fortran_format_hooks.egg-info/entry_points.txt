@@ -1,0 +1,2 @@
+[console_scripts]
+print-arguments = fortran_format_hooks.main:main

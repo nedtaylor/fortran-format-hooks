@@ -1,0 +1,8 @@
+Metadata-Version: 2.1
+Name: fortran-format-hooks
+Version: 0.1.0
+Summary: A pre-commit hook to check fortran format
+Home-page: https://github.com/nedtaylor
+Author: Ned Thaddeus Taylor
+Author-email: n.t.taylor@exeter.ac.uk
+License: MIT
