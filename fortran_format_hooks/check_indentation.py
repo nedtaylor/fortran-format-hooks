@@ -6,6 +6,11 @@ import argparse
 from collections.abc import Sequence
 
 
+def _autofix(filename: str, new_contents: str) -> None:
+    print(f'Fixing file {filename}')
+    with open(filename, 'w', encoding='UTF-8') as f:
+        f.write(new_contents)
+
 def check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
     if continuation_line:
         if actual_indent != continued_indent:
@@ -20,6 +25,7 @@ def check_if_match(actual_indent, expected_indent, continued_indent, continuatio
     return True
 
 def check_indentation(file_path, line_length=80):
+    corrected_lines = []
     procedure_indent = 2
     module_program_indent = 2
     loop_conditional_indent = 3
@@ -70,18 +76,22 @@ def check_indentation(file_path, line_length=80):
             # Skip empty lines
             if not stripped_line:
                 continuation_line = False
+                corrected_lines.append("") 
                 continue
 
             # If comment line !###, skip
             if re.match(r'^\s*!###', stripped_line):
+                corrected_lines.append(stripped_line)
                 continue
 
             # Check if preprocessing directive
             if re.match(r'^\s*#', stripped_line):
+                corrected_lines.append(stripped_line)
                 continue
 
             # Check for lines with ! in first column and skip
             if re.match(r'^!', stripped_line):
+                corrected_lines.append(stripped_line)
                 continue
 
             # If unbalanced quotes, check line starts with ampersand
@@ -91,7 +101,7 @@ def check_indentation(file_path, line_length=80):
                     print(stripped_line)
                     print("Number of single quotes: ", num_single_quotes)
                     print("Number of double quotes: ", num_double_quotes)
-                    return False
+                    return False, None
 
             # Replace all numbers at the start of the line with the same number of spaces
             stripped_line = re.sub(r'^\d+', lambda x: ' ' * len(x.group()), stripped_line)
@@ -100,7 +110,9 @@ def check_indentation(file_path, line_length=80):
             if re.match(r'^\s*!', stripped_line):
                 actual_indent = len(stripped_line) - len(stripped_line.lstrip())
                 if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
-                    return False
+                    success = False
+                    # return False
+                corrected_lines.append( " " * expected_indent + stripped_line.lstrip() )
                 continue
 
             # Handle previous line with unbalanced quotes
@@ -226,8 +238,13 @@ def check_indentation(file_path, line_length=80):
 
             # Check actual indentation
             actual_indent = len(stripped_line) - len(stripped_line.lstrip())
+            if continuation_line:
+                corrected_lines.append( " " * continued_indent + stripped_line.lstrip() )
+            else:
+                corrected_lines.append( " " * actual_indent + stripped_line.lstrip() )
             if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
-                return False
+                success = False
+                # return False
             
 
             # strip comments from end of line
@@ -248,7 +265,7 @@ def check_indentation(file_path, line_length=80):
                 # If it was a continuation line, reset to normal expected indentation
                 if unbalanced_quotes:
                     print(f"Unbalanced quotes in {file_path}, line {line_num}")
-                    return False
+                    return False, None
                 open_bracket_count = 0
                 close_bracket_count = 0
                 unbalanced_brackets = 0
@@ -357,7 +374,10 @@ def check_indentation(file_path, line_length=80):
                 readwrite_line = True
 
 
-    return success
+    # if not present, add blank line to end of file
+    if corrected_lines[-1].strip():
+        corrected_lines.append("")
+    return success, "\n".join(corrected_lines)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -371,43 +391,31 @@ def main(argv: Sequence[str] | None = None) -> int:
         '--line-length', type=int, default=80,
         help='Maximum line length.',
     )
+    parser.add_argument(
+        '--autofix',
+        action='store_true',
+        dest='autofix',
+        help='Automatically fixes encountered indentation errors.',
+    )
     args = parser.parse_args(argv)
 
     success = 0
+    print("Autofix: ", args.autofix)
     for filename in args.filenames:
         ## only apply if .f90 or .F90 file
         if not filename.endswith('.f90') and not filename.endswith('.F90'):
             continue
-        if not check_indentation(filename, args.line_length):
-            success = 1
-        else:
+        success, corrected_code = check_indentation(filename, args.line_length)
+        # if not check_indentation(filename, args.line_length):
+        #     success = 1
+        if success:
             print(f"{filename} passed indentation check.")
-    return success
-        # with open(filename, 'r') as file:
-        #     contents = f.read()
-
-    # # Check directory of script
-    # script_dir = os.path.dirname(os.path.abspath(__file__))
-    # os.chdir(script_dir+"/..")
-    
-    # # Get list of .f90 and .F90 files from ../src/fortran and ../app
-    # fortran_files = glob.glob("src/**/*.f90", recursive=True) + glob.glob("src/fortran/**/*.F90", recursive=True)
-    # app_files = glob.glob("app/**/*.f90", recursive=True) + glob.glob("app/**/*.F90", recursive=True)
-    # all_files = fortran_files + app_files
-
-    # # Check indentation of all files
-    # success = True
-    # for file_path in all_files:
-    #     if not check_indentation(file_path):
-    #         success = False
-    #     else:
-    #         print(f"{file_path} passed indentation check.")
-
-    # # Exit with error if any file failed indentation check
-    # if not success:
-    #     sys.exit("Indentation check failed.")
-    # else:
-    #     print("All files passed indentation check.")
+        else:
+            print(f"{filename} failed indentation check.")
+            if args.autofix:
+                _autofix(filename, corrected_code)
+ 
+    return 0 if success else 1
 
 if __name__ == "__main__":
     raise SystemExit(main())
