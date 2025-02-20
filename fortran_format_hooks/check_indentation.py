@@ -31,6 +31,12 @@ def check_if_match(actual_indent, expected_indent, continued_indent, continuatio
             return False
     return True
 
+def correct_lines(corrected_lines, stripped_line, expected_indent, continuation_line, continued_indent):
+    if continuation_line:
+        corrected_lines.append( " " * continued_indent + stripped_line.lstrip() )
+    else:
+        corrected_lines.append( " " * expected_indent + stripped_line.lstrip() )
+
 def check_indentation(file_path, line_length=80):
     corrected_lines = []
     procedure_indent = 2
@@ -119,7 +125,7 @@ def check_indentation(file_path, line_length=80):
                 if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
                     success = False
                     # return False
-                corrected_lines.append( " " * expected_indent + stripped_line.lstrip() )
+                correct_lines(corrected_lines, stripped_line, expected_indent, continuation_line, continued_indent)
                 continue
 
             # Handle previous line with unbalanced quotes
@@ -245,10 +251,8 @@ def check_indentation(file_path, line_length=80):
 
             # Check actual indentation
             actual_indent = len(stripped_line) - len(stripped_line.lstrip())
-            if continuation_line:
-                corrected_lines.append( " " * continued_indent + stripped_line.lstrip() )
-            else:
-                corrected_lines.append( " " * actual_indent + stripped_line.lstrip() )
+            
+            correct_lines(corrected_lines, stripped_line, expected_indent, continuation_line, continued_indent)
             if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
                 success = False
                 # return False
