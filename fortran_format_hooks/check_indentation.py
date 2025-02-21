@@ -244,7 +244,7 @@ def check_indentation(file_path, line_length=80):
                 inside_procedure = False
 
             # Detect end of module or program
-            if re.match(r'^\s*end\s*(module|program)\b', stripped_line, re.IGNORECASE):
+            if re.match(r'^\s*end\s*(submodule|module|program)\b', stripped_line, re.IGNORECASE):
                 expected_indent -= module_program_indent
 
 
@@ -255,7 +255,7 @@ def check_indentation(file_path, line_length=80):
             correct_lines(corrected_lines, stripped_line, expected_indent, continuation_line, continued_indent)
             if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
                 success = False
-                # return False
+                # return False, None
             
 
             # strip comments from end of line
@@ -299,13 +299,14 @@ def check_indentation(file_path, line_length=80):
             
 
             # Detect module or program blocks (specifically avoid module procedure/function)
-            if re.match(r'^\s*module\b(?!\s+(procedure|function))', stripped_line, re.IGNORECASE) or \
-                re.match(r'^\s*program\b', stripped_line, re.IGNORECASE):
+            if re.match(r'^\s*module\b(?!\s+(recursive|procedure|function|subroutine))', stripped_line, re.IGNORECASE) or \
+                re.match(r'^\s*(submodule|program)\b', stripped_line, re.IGNORECASE):
                 expected_indent += module_program_indent
 
             # Detect procedure blocks, can be "module (function|subroutine|procedure)" or "(function|subroutine|procedure)" but not "procedure," or "procedure ::"
             if re.match(r'^\s*(integer\s+|logical\s+)?(pure\s+)?(module\s+)?(recursive\s+)?(function|subroutine|procedure)\b', stripped_line, re.IGNORECASE) and \
                 not re.match(r'^\s*(function|subroutine|procedure)\s*(,|::)', stripped_line, re.IGNORECASE) and \
+                not re.match(r'^\s*procedure\s*(\(|\,)', stripped_line, re.IGNORECASE) and \
                 not ( interface_block and re.match(r'^\s*procedure\s+\w+,', stripped_line, re.IGNORECASE) ):
                 # print(stripped_line)
                 # print(re.match(r'^\s*(integer\s+)', stripped_line, re.IGNORECASE), stripped_line)
