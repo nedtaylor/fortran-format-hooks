@@ -51,6 +51,7 @@ def check_indentation(file_path, line_length=80):
     specifier_line = False
     inside_derived_type = False
     on_continued_if_line = False
+    on_continue_case_line = False
     inside_procedure_arguments = False
     inside_associate_arguments = False
     inside_do_concurrent_limits = False
@@ -370,6 +371,11 @@ def check_indentation(file_path, line_length=80):
                     expected_indent += loop_conditional_indent
                 on_continued_if_line = False
 
+            # Detect end of continue case line
+            if on_continue_case_line and not continuation_line:
+                expected_indent += loop_conditional_indent
+                on_continue_case_line = False
+
             # Detect if linebreak statement with optional "NAME:"
             if continuation_line and \
                ( re.match(r'^\s*\w+\s*:\s*(if)\b', stripped_line, re.IGNORECASE) or \
@@ -377,9 +383,12 @@ def check_indentation(file_path, line_length=80):
                 on_continued_if_line = True
 
             # Detect select type, select case, and select rank
-            if re.match(r'^\s*select\s+(type|case|rank)\b', stripped_line, re.IGNORECASE):
-                expected_indent += loop_conditional_indent
-                inside_select = True
+            if re.match(r'^\s*(?:\w+\s*:\s*)?select\s+(type|case|rank)\b', stripped_line, re.IGNORECASE):
+                if stripped_line.lower().endswith("&"):
+                    on_continue_case_line = True
+                else:
+                    expected_indent += loop_conditional_indent
+                    inside_select = True
 
             # Detect read/write statement
             if re.match(r'^\s*(read|write)\(\b', stripped_line, re.IGNORECASE):
