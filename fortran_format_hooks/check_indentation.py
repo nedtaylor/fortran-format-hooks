@@ -51,7 +51,8 @@ def check_indentation(file_path, line_length=80):
     specifier_line = False
     inside_derived_type = False
     on_continued_if_line = False
-    on_continue_case_line = False
+    on_continued_loop_line = False
+    on_continued_case_line = False
     inside_procedure_arguments = False
     inside_associate_arguments = False
     inside_do_concurrent_limits = False
@@ -125,7 +126,7 @@ def check_indentation(file_path, line_length=80):
                 actual_indent = len(stripped_line) - len(stripped_line.lstrip())
                 if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
                     success = False
-                    # return False
+                    # return False, None
                 correct_lines(corrected_lines, stripped_line, expected_indent, continuation_line, continued_indent)
                 continue
 
@@ -176,7 +177,7 @@ def check_indentation(file_path, line_length=80):
                 num_double_quotes = 0
 
             # Check if line starts with close bracket, if so, update the indentation
-            if re.match(r'^\s*(\)|/\)|\])', stripped_line_excld_quote):
+            if re.match(r'^\s*(\)|/\)|\])', stripped_line): #stripped_line_excld_quote):
                 continued_indent = expected_indent + ( unbalanced_brackets - 1 ) * continuation_indent
 
             # Count open and close brackets
@@ -342,8 +343,11 @@ def check_indentation(file_path, line_length=80):
             # Detect do loop, and where statement with optional "NAME:"
             if re.match(r'^\s*\w+\s*:\s*(do|where)\b', stripped_line, re.IGNORECASE) or \
                re.match(r'^\s*(do|where)\b', stripped_line, re.IGNORECASE):
-                expected_indent += loop_conditional_indent
-                inside_loop_conditional = True
+                if stripped_line.lower().endswith("&"):
+                    on_continued_loop_line = True
+                else:
+                    expected_indent += loop_conditional_indent
+                    inside_loop_conditional = True
 
             # Detect do concurrent linebreak statement with optional "NAME:"
             if re.match(r'^\s*\w+\s*:\s*do\s+concurrent\b', stripped_line, re.IGNORECASE) or \
@@ -371,10 +375,15 @@ def check_indentation(file_path, line_length=80):
                     expected_indent += loop_conditional_indent
                 on_continued_if_line = False
 
-            # Detect end of continue case line
-            if on_continue_case_line and not continuation_line:
+            # Detect end of continued case line
+            if on_continued_case_line and not continuation_line:
                 expected_indent += loop_conditional_indent
-                on_continue_case_line = False
+                on_continued_case_line = False
+
+            # Detect end of continued loop line
+            if on_continued_loop_line and not continuation_line:
+                expected_indent += loop_conditional_indent
+                on_continued_loop_line = False
 
             # Detect if linebreak statement with optional "NAME:"
             if continuation_line and \
@@ -385,13 +394,13 @@ def check_indentation(file_path, line_length=80):
             # Detect select type, select case, and select rank
             if re.match(r'^\s*(?:\w+\s*:\s*)?select\s+(type|case|rank)\b', stripped_line, re.IGNORECASE):
                 if stripped_line.lower().endswith("&"):
-                    on_continue_case_line = True
+                    on_continued_case_line = True
                 else:
                     expected_indent += loop_conditional_indent
                     inside_select = True
 
             # Detect read/write statement
-            if re.match(r'^\s*(read|write)\(\b', stripped_line, re.IGNORECASE):
+            if re.match(r'^\s*(read|write)\s*\(', stripped_line, re.IGNORECASE):
                 readwrite_line = True
 
 
