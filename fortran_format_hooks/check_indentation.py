@@ -45,7 +45,7 @@ def check_indentation(file_path, line_length=80):
     continuation_indent = 5
 
     inside_module_program = False
-    inside_procedure = False
+    procedure_depth = 0
     inside_loop_conditional = False
     inside_select = False
     specifier_line = False
@@ -240,9 +240,9 @@ def check_indentation(file_path, line_length=80):
                 inside_derived_type = False
 
             # Detect end of procedure block
-            if inside_procedure and re.match(r'^\s*end\s*(function|subroutine|procedure)\b', stripped_line, re.IGNORECASE):
+            if procedure_depth > 0 and re.match(r'^\s*end\s*(function|subroutine|procedure)\b', stripped_line, re.IGNORECASE):
                 expected_indent -= procedure_indent
-                inside_procedure = False
+                procedure_depth -= 1
 
             # Detect end of module or program
             if re.match(r'^\s*end\s*(submodule|module|program)\b', stripped_line, re.IGNORECASE):
@@ -311,7 +311,7 @@ def check_indentation(file_path, line_length=80):
                 not ( interface_block and re.match(r'^\s*procedure\s+\w+,', stripped_line, re.IGNORECASE) ):
                 # print(stripped_line)
                 # print(re.match(r'^\s*(integer\s+)', stripped_line, re.IGNORECASE), stripped_line)
-                inside_procedure = True
+                procedure_depth += 1
                 if stripped_line.lower().endswith("&"):
                     inside_procedure_arguments = True
                 else:
