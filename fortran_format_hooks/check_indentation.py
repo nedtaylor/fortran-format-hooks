@@ -78,7 +78,7 @@ def check_indentation(file_path, line_length=80):
 
             # Be more relaxed with comment lines regarding line length (using PEP8, flake8-bugbear, B950)
             # https://stackoverflow.com/questions/46863890/does-pythons-pep8-line-length-limit-apply-to-comments
-            if re.match(r'^!', line):
+            if re.match(r'^\s*!', line):
                 if len(line) > line_length + 1 + 0.1 * line_length:
                     print(f"Comment Line {line_num} in {file_path} exceeds {line_length} characters: {len(line)}")
             # check length of line does not exceed
@@ -253,11 +253,15 @@ def check_indentation(file_path, line_length=80):
 
             # Check actual indentation
             actual_indent = len(stripped_line) - len(stripped_line.lstrip())
-            
-            correct_lines(corrected_lines, stripped_line, expected_indent, continuation_line, continued_indent)
-            if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
-                success = False
-                # return False, None
+            if re.match(r'^\s*contains\s*$', re.sub(r'!.*', '', stripped_line).strip(), re.IGNORECASE) and procedure_depth == 0 and not inside_derived_type:
+                correct_lines(corrected_lines, stripped_line, 0, continuation_line, continued_indent)
+                if not check_if_match(actual_indent, 0, continued_indent, continuation_line, line_num, file_path):
+                    success = False
+            else:
+                correct_lines(corrected_lines, stripped_line, expected_indent, continuation_line, continued_indent)
+                if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
+                    success = False
+                    # return False, None
             
 
             # strip comments from end of line
@@ -308,15 +312,17 @@ def check_indentation(file_path, line_length=80):
             # Detect procedure blocks, can be "module (function|subroutine|procedure)" or "(function|subroutine|procedure)" but not "procedure(", "procedure," or "procedure ::"
             if re.match(r'^\s*(integer\s+|logical\s+)?(elemental\s+|recursive\s+|pure\s+)?(module\s+)?(recursive\s+)?(function|subroutine|procedure)\b', stripped_line, re.IGNORECASE) and \
                 not re.match(r'^\s*(function|subroutine|procedure)\s*(,|::)', stripped_line, re.IGNORECASE) and \
-                not re.match(r'^\s*procedure\s*(\(|\,)', stripped_line, re.IGNORECASE) and \
-                not ( interface_block and re.match(r'^\s*procedure\s+\w+,', stripped_line, re.IGNORECASE) ):
-                # print(stripped_line)
-                # print(re.match(r'^\s*(integer\s+)', stripped_line, re.IGNORECASE), stripped_line)
-                procedure_depth += 1
-                if stripped_line.lower().endswith("&"):
-                    inside_procedure_arguments = True
-                else:
-                    expected_indent += procedure_indent
+                not re.match(r'^\s*procedure\s*(\(|\,)', stripped_line, re.IGNORECASE): # and \
+                # not ( interface_block and re.match(r'^(?!\s*procedure\s+\w+\s*\()', stripped_line, re.IGNORECASE) ):
+                if not ( interface_block and re.match(r'^\s*procedure\b', stripped_line, re.IGNORECASE) ):
+                    # print(stripped_line)
+                    # print("INTERFACE BLOCK: ", interface_block)
+                    # print(re.match(r'^\s*(integer\s+)', stripped_line, re.IGNORECASE), stripped_line)
+                    procedure_depth += 1
+                    if stripped_line.lower().endswith("&"):
+                        inside_procedure_arguments = True
+                    else:
+                        expected_indent += procedure_indent
 
 
             # Detect derived type block
