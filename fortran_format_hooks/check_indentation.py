@@ -68,6 +68,8 @@ def check_indentation(file_path, line_length=80):
     num_single_quotes = 0
     num_double_quotes = 0
     unbalanced_quotes = False
+    equality_depth = 0
+    equality_brackets = []
 
     success = True
 
@@ -178,7 +180,7 @@ def check_indentation(file_path, line_length=80):
 
             # Check if line starts with close bracket, if so, update the indentation
             if re.match(r'^\s*(\)|/\)|\])', stripped_line): #stripped_line_excld_quote):
-                continued_indent = expected_indent + ( unbalanced_brackets - 1 ) * continuation_indent
+                continued_indent = expected_indent + ( unbalanced_brackets - 1 ) * continuation_indent + equality_depth * continuation_indent
 
             # Count open and close brackets
             open_bracket_count += stripped_line_excld_quote.count('(')
@@ -251,24 +253,42 @@ def check_indentation(file_path, line_length=80):
 
 
 
+            #-----------------------------------------------------------------------------------------------
             # Check actual indentation
+            #-----------------------------------------------------------------------------------------------
             actual_indent = len(stripped_line) - len(stripped_line.lstrip())
-            if re.match(r'^\s*contains\s*$', re.sub(r'!.*', '', stripped_line).strip(), re.IGNORECASE) and procedure_depth == 0 and not inside_derived_type:
-                correct_lines(corrected_lines, stripped_line, 0, continuation_line, continued_indent)
-                if not check_if_match(actual_indent, 0, continued_indent, continuation_line, line_num, file_path):
-                    success = False
-            else:
-                correct_lines(corrected_lines, stripped_line, expected_indent, continuation_line, continued_indent)
-                if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
-                    success = False
-                    # return False, None
+            correct_lines(corrected_lines, stripped_line, expected_indent, continuation_line, continued_indent)
+            if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
+                success = False
+                # return False, None
+            #-----------------------------------------------------------------------------------------------
             
 
             # strip comments from end of line
             stripped_line = re.sub(r'!.*', '', stripped_line).strip()
 
+            # Check if entering an equality statement
+            if equality_depth > 0:
+                if not stripped_line.endswith('&'):
+                    equality_depth = 0
+                elif equality_brackets[-1] > unbalanced_brackets:
+                    equality_depth -=1
+                    equality_brackets.pop()
+                elif re.search(r',\s*&$', stripped_line) and equality_brackets[-1] == unbalanced_brackets:
+                    equality_depth -= 1
+                    equality_brackets.pop()
+            if equality_depth == 0:
+                equality_brackets = []
+
+            # Check if line ends with "&" and has = as the last non-whitespace character before "&"
             if continuation_line:
-                continued_indent = expected_indent + unbalanced_brackets * continuation_indent
+                if stripped_line.endswith("&") and re.search(r'=\s*&$', stripped_line):
+                    equality_depth += 1
+                    equality_brackets.append(unbalanced_brackets)
+
+            # Calculate expected indentation for continuation line
+            if continuation_line:
+                continued_indent = expected_indent + unbalanced_brackets * continuation_indent + equality_depth * continuation_indent
 
             # Check for line continuation character
             if stripped_line.endswith('&'):
