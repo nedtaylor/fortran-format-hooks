@@ -334,7 +334,7 @@ def check_indentation(file_path, line_length=80):
                 not re.match(r'^\s*(function|subroutine|procedure)\s*(,|::)', stripped_line, re.IGNORECASE) and \
                 not re.match(r'^\s*procedure\s*(\(|\,)', stripped_line, re.IGNORECASE): # and \
                 # not ( interface_block and re.match(r'^(?!\s*procedure\s+\w+\s*\()', stripped_line, re.IGNORECASE) ):
-                if not ( interface_block and re.match(r'^\s*procedure\b', stripped_line, re.IGNORECASE) ):
+                if not ( interface_block and re.match(r'^\s*(module\s+)?procedure\b', stripped_line, re.IGNORECASE) ):
                     # print(stripped_line)
                     # print("INTERFACE BLOCK: ", interface_block)
                     # print(re.match(r'^\s*(integer\s+)', stripped_line, re.IGNORECASE), stripped_line)
