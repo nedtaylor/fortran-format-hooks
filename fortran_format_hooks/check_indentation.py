@@ -3,7 +3,7 @@ import re
 import sys
 import glob
 import argparse
-from collections.abc import Sequence
+from typing import Optional, Sequence
 
 ## Attribution statement:
 ##  Some of the functionality in this file is based on the pre-commit/pre-commit-hooks repository
@@ -436,7 +436,7 @@ def check_indentation(file_path, line_length=80):
     return success, "\n".join(corrected_lines)
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:
     # Code copied form https://github.com/pre-commit/pre-commit-hooks/blob/main/pre_commit_hooks/check_added_large_files.py
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -453,6 +453,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         dest='autofix',
         help='Automatically fixes encountered indentation errors.',
     )
+    ## add option to ignore filepath patterns
+    parser.add_argument(
+        '--ignore-patterns',
+        dest='ignore_patterns',
+        nargs='*',
+        help='Ignore files that match these patterns.',
+    )
+    ## add option to ignore specified directories
+    parser.add_argument(
+        '--ignore-directories',
+        dest='ignore_directories',
+        nargs='*',
+        help='Ignore files in these directories.',
+    )
     args = parser.parse_args(argv)
 
     success = True
@@ -460,6 +474,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         ## only apply if .f90 or .F90 file
         if not filename.endswith('.f90') and not filename.endswith('.F90'):
             continue
+        ## check if file matches ignore patterns
+        if args.ignore_patterns:
+            for pattern in args.ignore_patterns:
+                if re.match(pattern, filename):
+                    continue
+        ## check if file is in ignore directories
+        if args.ignore_directories:
+            for directory in args.ignore_directories:
+                if directory in filename:
+                    continue
         success, corrected_code = check_indentation(filename, args.line_length)
         # if not check_indentation(filename, args.line_length):
         #     success = 1
