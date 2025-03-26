@@ -379,12 +379,12 @@ def check_indentation(file_path, line_length=80):
             if re.match(r'^\s*\w+\s*:\s*do\s+concurrent\b', stripped_line, re.IGNORECASE) or \
                re.match(r'^\s*do\s+concurrent\b', stripped_line, re.IGNORECASE):
                 inside_do_concurrent_limits = True
-                expected_indent -= loop_conditional_indent
+                # expected_indent -= loop_conditional_indent
                 inside_loop_conditional = False
             
             if inside_do_concurrent_limits and not continuation_line:
-                if stripped_line.lower().endswith(")"):
-                    expected_indent += loop_conditional_indent
+                # if stripped_line.lower().endswith(")"):
+                #     expected_indent += loop_conditional_indent
                 inside_do_concurrent_limits = False
                 inside_loop_conditional = True
 
