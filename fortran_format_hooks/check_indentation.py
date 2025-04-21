@@ -471,6 +471,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     success = True
     for filename in args.filenames:
+        skip_file = False
         ## only apply if .f90 or .F90 file
         if not filename.endswith('.f90') and not filename.endswith('.F90'):
             continue
@@ -478,12 +479,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if args.ignore_patterns:
             for pattern in args.ignore_patterns:
                 if re.match(pattern, filename):
-                    continue
+                    skip_file = True
+                    print(f"Skipping file {filename} because it matches the ignore pattern {pattern}.")
+                    break
         ## check if file is in ignore directories
         if args.ignore_directories:
             for directory in args.ignore_directories:
                 if directory in filename:
-                    continue
+                    skip_file = True
+                    break
+        if skip_file:
+            print(f"Skipping file {filename} because it is in an ignored directory.")
+            continue
         success, corrected_code = check_indentation(filename, args.line_length)
         # if not check_indentation(filename, args.line_length):
         #     success = 1
