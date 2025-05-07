@@ -93,7 +93,8 @@ def check_indentation(file_path, line_length=80):
             # Skip empty lines
             if not stripped_line:
                 continuation_line = False
-                corrected_lines.append("") 
+                corrected_lines.append("")
+                readwrite_line = False
                 continue
 
             # If comment line !###, skip
@@ -426,7 +427,7 @@ def check_indentation(file_path, line_length=80):
                     inside_select = True
 
             # Detect read/write statement
-            if re.match(r'^\s*(read|write)\s*\(', stripped_line, re.IGNORECASE):
+            if re.match(r'^\s*(read|write)\s*\(', stripped_line, re.IGNORECASE) and stripped_line.lower().endswith("&"):
                 readwrite_line = True
 
 
