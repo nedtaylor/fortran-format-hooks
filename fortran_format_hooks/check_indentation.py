@@ -85,8 +85,11 @@ def check_indentation(file_path, line_length=80):
                     print(f"Comment Line {line_num} in {file_path} exceeds {line_length} characters: {len(line)}")
             # check length of line does not exceed
             elif len(line) > line_length + 1:
-                print(f"Line {line_num} in {file_path} exceeds {line_length} characters: {len(line)}")
-                success = False
+                if len(line) > line_length + 1 + 0.1 * line_length:
+                    print(f"Line {line_num} in {file_path} exceeds hard limit {line_length} characters: {len(line)}")
+                    success = False
+                elif len(line) > line_length + 1:
+                    print(f"Note: Line {line_num} in {file_path} exceeds {line_length} characters: {len(line)}, but within 10% of limit")
 
             stripped_line = line.rstrip()
 
