@@ -37,7 +37,7 @@ def correct_lines(corrected_lines, stripped_line, expected_indent, continuation_
     else:
         corrected_lines.append( " " * expected_indent + stripped_line.lstrip() )
 
-def check_indentation(file_path, line_length=80):
+def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
     corrected_lines = []
     procedure_indent = 2
     module_program_indent = 2
@@ -73,6 +73,8 @@ def check_indentation(file_path, line_length=80):
 
     success = True
 
+    relaxed_line_length = int(line_length * relaxed_line_margin)
+
     with open(file_path, 'r') as file:
         for line_num, line in enumerate(file, start=1):
             
@@ -81,15 +83,15 @@ def check_indentation(file_path, line_length=80):
             # Be more relaxed with comment lines regarding line length (using PEP8, flake8-bugbear, B950)
             # https://stackoverflow.com/questions/46863890/does-pythons-pep8-line-length-limit-apply-to-comments
             if re.match(r'^\s*!', line):
-                if len(line) > line_length + 1 + 0.1 * line_length:
-                    print(f"Comment Line {line_num} in {file_path} exceeds {line_length} characters: {len(line)}")
+                if len(line) > line_length + 1 + relaxed_line_length:
+                    print(f"Comment Line {line_num} in {file_path} exceeds {line_length} characters: {len(line) - 1}")
             # check length of line does not exceed
             elif len(line) > line_length + 1:
-                if len(line) > line_length + 1 + 0.1 * line_length:
-                    print(f"Line {line_num} in {file_path} exceeds hard limit {line_length} characters: {len(line)}")
+                if len(line) > line_length + 1 + relaxed_line_length:
+                    print(f"Line {line_num} in {file_path} exceeds hard limit {line_length + relaxed_line_length} characters: {len(line) - 1}")
                     success = False
-                elif len(line) > line_length + 1:
-                    print(f"Note: Line {line_num} in {file_path} exceeds {line_length} characters: {len(line)}, but within 10% of limit")
+                else:
+                    print(f"Note: Line {line_num} in {file_path} exceeds {line_length} characters: {len(line) - 1}, but within 10% of limit")
 
             stripped_line = line.rstrip()
 
@@ -452,6 +454,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         help='Maximum line length.',
     )
     parser.add_argument(
+        '--relaxed-line-margin', type=float, default=0.1,
+        help='Leniency for line length check (0.1 = 10%).',
+    )
+    parser.add_argument(
         '--autofix',
         action='store_true',
         dest='autofix',
@@ -495,7 +501,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if skip_file:
             print(f"Skipping file {filename} because it is in an ignored directory.")
             continue
-        success, corrected_code = check_indentation(filename, args.line_length)
+        success, corrected_code = check_indentation(filename, args.line_length, args.relaxed_line_margin)
         # if not check_indentation(filename, args.line_length):
         #     success = 1
         if success:
