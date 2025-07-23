@@ -94,6 +94,7 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
     inside_associate_arguments = False
     inside_do_concurrent_limits = False
     interface_block = False
+
     readwrite_argument_line = False
     readwrite_statement_line = False
 
@@ -374,7 +375,8 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
                     expected_indent += loop_conditional_indent
             
             # Detect block block
-            if re.match(r'^\s*block\b', stripped_line, re.IGNORECASE):
+            if re.match(r'^\s*\w+\s*:\s*block\b', stripped_line, re.IGNORECASE) or \
+               re.match(r'^\s*block\b', stripped_line, re.IGNORECASE):
                 expected_indent += procedure_indent
 
             # Detect do loop, and where statement with optional "NAME:"
