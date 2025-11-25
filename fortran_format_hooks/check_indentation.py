@@ -93,6 +93,7 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
     inside_procedure_arguments = False
     inside_associate_arguments = False
     inside_do_concurrent_limits = False
+    inside_do_concurrent_range = False
     interface_block = False
 
     readwrite_argument_line = False
@@ -288,6 +289,14 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
             if equality_depth == 0:
                 equality_brackets = []
 
+            # Check if current line ends with colon and ampersand (for next line)
+            # This must happen BEFORE calculating continued_indent so it affects the next line
+            if inside_do_concurrent_limits and stripped_line.endswith('&'):
+                if re.search(r':\s*&$', stripped_line):
+                    inside_do_concurrent_range = True
+                else:
+                    inside_do_concurrent_range = False
+
             # Check if line ends with "&" and has = as the last non-whitespace character before "&"
             if continuation_line:
                 if stripped_line.endswith("&") and re.search(r'=\s*&$', stripped_line):
@@ -299,6 +308,8 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
                 continued_indent = expected_indent + unbalanced_brackets * continuation_indent + equality_depth * continuation_indent
                 if readwrite_statement_line:
                     continued_indent += continuation_indent
+                if inside_do_concurrent_range:
+                    continued_indent += continuation_indent
 
             # Check for line continuation character
             if stripped_line.endswith('&'):
@@ -306,6 +317,8 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
                     continuation_line = True
                     # Set expected indentation for next line
                     continued_indent = expected_indent + continuation_indent
+                    if inside_do_concurrent_range:
+                        continued_indent += continuation_indent
                     if unbalanced_brackets == 0:
                         unbalanced_brackets = 1
             else:
@@ -328,6 +341,8 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
                     readwrite_argument_line = False
                 if readwrite_statement_line:
                     readwrite_statement_line = False
+                if inside_do_concurrent_range:
+                    inside_do_concurrent_range = False
                     
 
             # Reset from contains line
@@ -465,7 +480,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     parser.add_argument(
         '--relaxed-line-margin', type=float, default=0.1,
-        help='Leniency for line length check (0.1 = 10%).',
+        help='Leniency for line length check (0.1 = 10%%).',
     )
     parser.add_argument(
         '--autofix',
