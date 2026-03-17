@@ -112,6 +112,8 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
     equality_brackets = []
     in_single_quote = False
     in_double_quote = False
+    prior_indent = 0
+    preprocessor_stack = []  # Stack of state snapshots for nested preprocessor blocks
 
     success = True
 
@@ -151,6 +153,73 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
             # Check if preprocessing directive
             if re.match(r'^\s*#', stripped_line):
                 corrected_lines.append(stripped_line)
+                if re.match(r'^\s*#\s*(if|ifdef|ifndef)\b', stripped_line, re.IGNORECASE):
+                    preprocessor_stack.append({
+                        'inside_module_program': inside_module_program,
+                        'procedure_depth': procedure_depth,
+                        'inside_loop_conditional': inside_loop_conditional,
+                        'inside_select': inside_select,
+                        'specifier_line': specifier_line,
+                        'inside_derived_type': inside_derived_type,
+                        'on_continued_if_line': on_continued_if_line,
+                        'on_continued_loop_line': on_continued_loop_line,
+                        'on_continued_case_line': on_continued_case_line,
+                        'inside_procedure_arguments': inside_procedure_arguments,
+                        'inside_associate_arguments': inside_associate_arguments,
+                        'inside_do_concurrent_limits': inside_do_concurrent_limits,
+                        'inside_do_concurrent_range': inside_do_concurrent_range,
+                        'interface_block': interface_block,
+                        'readwrite_argument_line': readwrite_argument_line,
+                        'readwrite_statement_line': readwrite_statement_line,
+                        'expected_indent': expected_indent,
+                        'continuation_line': continuation_line,
+                        'open_bracket_count': open_bracket_count,
+                        'close_bracket_count': close_bracket_count,
+                        'unbalanced_brackets': unbalanced_brackets,
+                        'continued_indent': continued_indent,
+                        'equality_depth': equality_depth,
+                        'equality_brackets': equality_brackets[:],
+                        'in_single_quote': in_single_quote,
+                        'in_double_quote': in_double_quote,
+                        'prior_indent': prior_indent,
+                    })
+                    continuation_line = False
+                    unbalanced_brackets = 0
+                    open_bracket_count = 0
+                    close_bracket_count = 0
+                elif re.match(r'^\s*#\s*(else|elif)\b', stripped_line, re.IGNORECASE):
+                    if preprocessor_stack:
+                        snap = preprocessor_stack[-1]
+                        inside_module_program = snap['inside_module_program']
+                        procedure_depth = snap['procedure_depth']
+                        inside_loop_conditional = snap['inside_loop_conditional']
+                        inside_select = snap['inside_select']
+                        specifier_line = snap['specifier_line']
+                        inside_derived_type = snap['inside_derived_type']
+                        on_continued_if_line = snap['on_continued_if_line']
+                        on_continued_loop_line = snap['on_continued_loop_line']
+                        on_continued_case_line = snap['on_continued_case_line']
+                        inside_procedure_arguments = snap['inside_procedure_arguments']
+                        inside_associate_arguments = snap['inside_associate_arguments']
+                        inside_do_concurrent_limits = snap['inside_do_concurrent_limits']
+                        inside_do_concurrent_range = snap['inside_do_concurrent_range']
+                        interface_block = snap['interface_block']
+                        readwrite_argument_line = snap['readwrite_argument_line']
+                        readwrite_statement_line = snap['readwrite_statement_line']
+                        expected_indent = snap['expected_indent']
+                        continuation_line = snap['continuation_line']
+                        open_bracket_count = snap['open_bracket_count']
+                        close_bracket_count = snap['close_bracket_count']
+                        unbalanced_brackets = snap['unbalanced_brackets']
+                        continued_indent = snap['continued_indent']
+                        equality_depth = snap['equality_depth']
+                        equality_brackets = snap['equality_brackets'][:]
+                        in_single_quote = snap['in_single_quote']
+                        in_double_quote = snap['in_double_quote']
+                        prior_indent = snap['prior_indent']
+                elif re.match(r'^\s*#\s*endif\b', stripped_line, re.IGNORECASE):
+                    if preprocessor_stack:
+                        preprocessor_stack.pop()
                 continue
 
             # Check for lines with ! in first column and skip
@@ -164,9 +233,10 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
             # Check if line starts with comment
             if re.match(r'^\s*!', stripped_line):
                 actual_indent = len(stripped_line) - len(stripped_line.lstrip())
-                if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
-                    success = False
-                    # return False, None
+                if not preprocessor_stack:
+                    if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
+                        success = False
+                        # return False, None
                 correct_lines(corrected_lines, stripped_line, expected_indent, continuation_line, continued_indent)
                 continue
 
@@ -267,9 +337,10 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
             #-----------------------------------------------------------------------------------------------
             actual_indent = len(stripped_line) - len(stripped_line.lstrip())
             correct_lines(corrected_lines, stripped_line, expected_indent, continuation_line, continued_indent)
-            if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
-                success = False
-                # return False, None
+            if not preprocessor_stack:
+                if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
+                    success = False
+                    # return False, None
             #-----------------------------------------------------------------------------------------------
             
 
