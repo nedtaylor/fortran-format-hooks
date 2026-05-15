@@ -428,11 +428,16 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
                 expected_indent += module_program_indent
 
             # Detect procedure blocks, can be "module (function|subroutine|procedure)" or "(function|subroutine|procedure)" but not "procedure(", "procedure," or "procedure ::"
-            if re.match(r'^\s*(integer\s+|logical\s+)?(elemental\s+|recursive\s+|pure\s+)?(module\s+)?(recursive\s+)?(function|subroutine|procedure)\b', stripped_line, re.IGNORECASE) and \
-                not re.match(r'^\s*(function|subroutine|procedure)\s*(,|::)', stripped_line, re.IGNORECASE) and \
-                not re.match(r'^\s*procedure\s*(\(|\,)', stripped_line, re.IGNORECASE): # and \
-                # not ( interface_block and re.match(r'^(?!\s*procedure\s+\w+\s*\()', stripped_line, re.IGNORECASE) ):
-                if not ( interface_block and re.match(r'^\s*(module\s+)?procedure\b', stripped_line, re.IGNORECASE) ):
+            if re.match(
+                r'^\s*(?:'
+                r'(?:integer|logical|real|complex|character)(?:\s*\([^)]*\))?\s+'
+                r')?(?:elemental\s+|recursive\s+|pure\s+)?(?:module\s+)?(?:recursive\s+)?'
+                r'(function|subroutine|procedure)\b',
+                stripped_line,
+                re.IGNORECASE
+            ) and \
+            not re.match(r'^\s*(function|subroutine|procedure)\s*(,|::)', stripped_line, re.IGNORECASE) and \
+            not re.match(r'^\s*procedure\s*(\(|\,)', stripped_line, re.IGNORECASE):
                     # print(stripped_line)
                     # print("INTERFACE BLOCK: ", interface_block)
                     # print(re.match(r'^\s*(integer\s+)', stripped_line, re.IGNORECASE), stripped_line)
