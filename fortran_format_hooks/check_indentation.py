@@ -37,42 +37,65 @@ def correct_lines(corrected_lines, stripped_line, expected_indent, continuation_
     else:
         corrected_lines.append( " " * expected_indent + stripped_line.lstrip() )
 
-def strip_quoted_sections(line, in_single_quote=False, in_double_quote=False):
+def strip_comments_safely(line, in_single_quote=False, in_double_quote=False, continuing_quote=False):
+    """
+    Strip comments from a line, but only if the comment character (!) is not inside quotes.
+    Handles continuation lines with quotes correctly.
+    
+    Returns:
+        (processed_line, new_in_single_quote, new_in_double_quote, continuing_quote)
+    """
     result = []
     i = 0
-    quote_char = None
-
-    while i < len(line):
+    length = len(line)
+    
+    while i < length:
         char = line[i]
-
+        
+        # Handle backslash escapes (common in some Fortran compilers)
+        if char == '\\' and i + 1 < length and line[i + 1] in ['"', "'", '\\']:
+            result.append(char)
+            result.append(line[i + 1])
+            i += 2
+            continue
+        
+        # Toggle quote states
         if not in_single_quote and not in_double_quote:
             if char == "'":
                 in_single_quote = True
-                quote_char = "'"
+                result.append(char)
                 i += 1
                 continue
             elif char == '"':
                 in_double_quote = True
-                quote_char = '"'
+                result.append(char)
                 i += 1
                 continue
+            # Check for comment character outside quotes
+            elif char == '!':
+                # Found a comment - stop processing this line
+                # The comment and everything after it is stripped
+                break
             else:
                 result.append(char)
+                i += 1
         elif in_single_quote:
-            if char == "'" and (i + 1 >= len(line) or line[i + 1] != "'"):
+            result.append(char)
+            # Check for closing quote
+            if char == "'":
                 in_single_quote = False
-                quote_char = None
-            elif char == "'" and line[i + 1] == "'":  # Escaped quote
-                i += 1  # skip next quote
+            i += 1
         elif in_double_quote:
-            if char == '"' and (i + 1 >= len(line) or line[i + 1] != '"'):
+            result.append(char)
+            # Check for closing quote
+            if char == '"':
                 in_double_quote = False
-                quote_char = None
-            elif char == '"' and line[i + 1] == '"':  # Escaped quote
-                i += 1  # skip next quote
-        i += 1
-
-    return ''.join(result), in_single_quote, in_double_quote
+            i += 1
+    
+    # Check if we have an unclosed quote at the end of the line
+    continuing_quote = (in_single_quote or in_double_quote)
+    
+    return ''.join(result), in_single_quote, in_double_quote, continuing_quote
 
 def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
     corrected_lines = []
@@ -112,6 +135,7 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
     equality_brackets = []
     in_single_quote = False
     in_double_quote = False
+    continuing_quote = False  # Flag to indicate quote continues from previous line
     prior_indent = 0
     preprocessor_stack = []  # Stack of state snapshots for nested preprocessor blocks
 
@@ -122,8 +146,10 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
     with open(file_path, 'r') as file:
         for line_num, line in enumerate(file, start=1):
             
+            # Keep original line for preservation
+            original_line = line.rstrip('\n')
+            stripped_line = original_line.rstrip()
             
-
             # Be more relaxed with comment lines regarding line length (using PEP8, flake8-bugbear, B950)
             # https://stackoverflow.com/questions/46863890/does-pythons-pep8-line-length-limit-apply-to-comments
             if re.match(r'^\s*!', line):
@@ -137,11 +163,13 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
                 else:
                     print(f"Note: Line {line_num} in {file_path} exceeds {line_length} characters: {len(line) - 1}, but within 10% of limit")
 
-            stripped_line = line.rstrip()
-
             # Skip empty lines
             if not stripped_line:
                 continuation_line = False
+                # Reset quote continuation flag on empty line
+                if not continuing_quote:
+                    in_single_quote = False
+                    in_double_quote = False
                 corrected_lines.append("")
                 continue
 
@@ -181,6 +209,7 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
                         'equality_brackets': equality_brackets[:],
                         'in_single_quote': in_single_quote,
                         'in_double_quote': in_double_quote,
+                        'continuing_quote': continuing_quote,
                         'prior_indent': prior_indent,
                     })
                     continuation_line = False
@@ -216,6 +245,7 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
                         equality_brackets = snap['equality_brackets'][:]
                         in_single_quote = snap['in_single_quote']
                         in_double_quote = snap['in_double_quote']
+                        continuing_quote = snap['continuing_quote']
                         prior_indent = snap['prior_indent']
                 elif re.match(r'^\s*#\s*endif\b', stripped_line, re.IGNORECASE):
                     if preprocessor_stack:
@@ -230,72 +260,81 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
             # Replace all numbers at the start of the line with the same number of spaces
             stripped_line = re.sub(r'^\d+', lambda x: ' ' * len(x.group()), stripped_line)
 
-            # Check if line starts with comment
+            # Check if line starts with comment (after stripping numbers)
             if re.match(r'^\s*!', stripped_line):
                 actual_indent = len(stripped_line) - len(stripped_line.lstrip())
                 if not preprocessor_stack:
                     if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
                         success = False
-                        # return False, None
                 correct_lines(corrected_lines, stripped_line, expected_indent, continuation_line, continued_indent)
+                # Reset quote flags after a comment line
+                if not continuing_quote:
+                    in_single_quote = False
+                    in_double_quote = False
                 continue
 
-            # If inside a quoted section, check if line starts with ampersand
-            if in_single_quote or in_double_quote:
+            # Handle continuation from previous line with unclosed quotes
+            if continuing_quote:
+                # This line is a continuation of a quoted string
+                # Check if line starts with ampersand for continuation
                 if not re.match(r'^\s*&', stripped_line):
-                    print(f"Unbalanced quotes in {file_path}, line {line_num}")
+                    print(f"Missing continuation ampersand (&) for quoted string in {file_path}, line {line_num}")
                     print(stripped_line)
-                    return False, None
-
-            # Remove quoted sections from this line
-            stripped_line_excld_quote, in_single_quote, in_double_quote = strip_quoted_sections(
+                    return False, "\n".join(corrected_lines)
+            
+            # Safely remove quoted sections and comments
+            processed_line, in_single_quote, in_double_quote, continuing_quote = strip_comments_safely(
                 stripped_line,
                 in_single_quote=in_single_quote,
-                in_double_quote=in_double_quote
+                in_double_quote=in_double_quote,
+                continuing_quote=continuing_quote
             )
+            
+            # Create a version with comments stripped for analysis
+            stripped_line_analysis = processed_line.rstrip()
 
             # Check if line starts with close bracket, if so, update the indentation
-            if re.match(r'^\s*(\)|/\)|\])', stripped_line): #stripped_line_excld_quote):
+            if re.match(r'^\s*(\)|/\)|\])', stripped_line_analysis):
                 continued_indent = expected_indent + ( unbalanced_brackets - 1 ) * continuation_indent + equality_depth * continuation_indent
                 if readwrite_statement_line:
                     continued_indent += continuation_indent
 
             # Count open and close brackets
-            open_bracket_count += stripped_line_excld_quote.count('(')
-            open_bracket_count += stripped_line_excld_quote.count('[')
-            close_bracket_count += stripped_line_excld_quote.count(')')
-            close_bracket_count += stripped_line_excld_quote.count(']')
-            if readwrite_argument_line and re.match(r'^\s*(\)|/\)|\])', stripped_line_excld_quote):
+            open_bracket_count += stripped_line_analysis.count('(')
+            open_bracket_count += stripped_line_analysis.count('[')
+            close_bracket_count += stripped_line_analysis.count(')')
+            close_bracket_count += stripped_line_analysis.count(']')
+            if readwrite_argument_line and re.match(r'^\s*(\)|/\)|\])', stripped_line_analysis):
                 readwrite_argument_line = False
                 readwrite_statement_line = True
-            if stripped_line_excld_quote.count('(') + stripped_line_excld_quote.count('[') < \
-                    stripped_line_excld_quote.count(')') + stripped_line_excld_quote.count(']'):
+            if stripped_line_analysis.count('(') + stripped_line_analysis.count('[') < \
+                    stripped_line_analysis.count(')') + stripped_line_analysis.count(']'):
                 unbalanced_brackets -= 1
-            elif stripped_line_excld_quote.count('(') + stripped_line_excld_quote.count('[') > \
-                    stripped_line_excld_quote.count(')') + stripped_line_excld_quote.count(']'):
+            elif stripped_line_analysis.count('(') + stripped_line_analysis.count('[') > \
+                    stripped_line_analysis.count(')') + stripped_line_analysis.count(']'):
                 unbalanced_brackets += 1
 
 
             # Detect end of do loop, if statement, or where statement
-            if re.match(r'^\s*end\s*(do|if|where|select)\b', stripped_line, re.IGNORECASE):
+            if re.match(r'^\s*end\s*(do|if|where|select)\b', stripped_line_analysis, re.IGNORECASE):
                 expected_indent -= loop_conditional_indent
 
             # Detect else statements in if and where blocks, can be "PATTERN", "PATTERN\s*if", or "PATTERN\s*where"
-            if inside_loop_conditional and re.match(r'^\s*else\s*(if|where)?\b', stripped_line, re.IGNORECASE):
+            if inside_loop_conditional and re.match(r'^\s*else\s*(if|where)?\b', stripped_line_analysis, re.IGNORECASE):
                 prior_indent = expected_indent
                 expected_indent -= loop_conditional_indent
                 specifier_line = True
 
 
             # Detect case, type, and rank statements within select, can be "PATTERN(", "PATTERN (" or "PATTERN default"
-            if ( inside_select and re.match(r'^\s*(case|class is|type is|rank)\s*\(', stripped_line, re.IGNORECASE) ) or \
-               ( inside_select and re.match(r'^\s*(case|class|rank)\s+default\b', stripped_line, re.IGNORECASE) ):
+            if ( inside_select and re.match(r'^\s*(case|class is|type is|rank)\s*\(', stripped_line_analysis, re.IGNORECASE) ) or \
+               ( inside_select and re.match(r'^\s*(case|class|rank)\s+default\b', stripped_line_analysis, re.IGNORECASE) ):
                 prior_indent = expected_indent
                 expected_indent -= loop_conditional_indent
                 specifier_line = True
 
             # Detect if contains line
-            if re.match(r'^\s*contains\b', stripped_line, re.IGNORECASE):
+            if re.match(r'^\s*contains\b', stripped_line_analysis, re.IGNORECASE):
                 prior_indent = expected_indent
                 specifier_line = True
                 if inside_derived_type:
@@ -304,30 +343,30 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
                     expected_indent -= module_program_indent
 
             # Detect end of block block
-            if re.match(r'^\s*end\s*block\b', stripped_line, re.IGNORECASE):
+            if re.match(r'^\s*end\s*block\b', stripped_line_analysis, re.IGNORECASE):
                 expected_indent -= procedure_indent
 
             # Detect end of associate block
-            if re.match(r'^\s*end\s*associate\b', stripped_line, re.IGNORECASE):
+            if re.match(r'^\s*end\s*associate\b', stripped_line_analysis, re.IGNORECASE):
                 expected_indent -= loop_conditional_indent
 
             # Detect end of interface block
-            if re.match(r'^\s*end\s*interface\b', stripped_line, re.IGNORECASE):
+            if re.match(r'^\s*end\s*interface\b', stripped_line_analysis, re.IGNORECASE):
                 interface_block = False
                 expected_indent -= loop_conditional_indent
 
             # Detect end of derived type block
-            if inside_derived_type and re.match(r'^\s*end\s*type\b', stripped_line, re.IGNORECASE):
+            if inside_derived_type and re.match(r'^\s*end\s*type\b', stripped_line_analysis, re.IGNORECASE):
                 expected_indent -= loop_conditional_indent
                 inside_derived_type = False
 
             # Detect end of procedure block
-            if procedure_depth > 0 and re.match(r'^\s*end\s*(function|subroutine|procedure)\b', stripped_line, re.IGNORECASE):
+            if procedure_depth > 0 and re.match(r'^\s*end\s*(function|subroutine|procedure)\b', stripped_line_analysis, re.IGNORECASE):
                 expected_indent -= procedure_indent
                 procedure_depth -= 1
 
             # Detect end of module or program
-            if re.match(r'^\s*end\s*(submodule|module|program)\b', stripped_line, re.IGNORECASE):
+            if re.match(r'^\s*end\s*(submodule|module|program)\b', stripped_line_analysis, re.IGNORECASE):
                 expected_indent -= module_program_indent
 
 
@@ -336,16 +375,15 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
             # Check actual indentation
             #-----------------------------------------------------------------------------------------------
             actual_indent = len(stripped_line) - len(stripped_line.lstrip())
-            correct_lines(corrected_lines, stripped_line, expected_indent, continuation_line, continued_indent)
+            correct_lines(corrected_lines, original_line.rstrip(), expected_indent, continuation_line, continued_indent)
             if not preprocessor_stack:
                 if not check_if_match(actual_indent, expected_indent, continued_indent, continuation_line, line_num, file_path):
                     success = False
-                    # return False, None
             #-----------------------------------------------------------------------------------------------
             
 
-            # strip comments from end of line
-            stripped_line = re.sub(r'!.*', '', stripped_line).strip()
+            # Use the analysis version (without comments) for further parsing
+            stripped_line = stripped_line_analysis
 
             # Check if entering an equality statement
             if equality_depth > 0:
@@ -394,26 +432,27 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
                         unbalanced_brackets = 1
             else:
                 # If it was a continuation line, reset to normal expected indentation
-                if in_single_quote or in_double_quote:
-                    print(f"Unbalanced quotes in {file_path}, line {line_num}")
-                    return False, None
-                open_bracket_count = 0
-                close_bracket_count = 0
-                unbalanced_brackets = 0
-                if continuation_line:
-                    continuation_line = False
-                if inside_procedure_arguments:
-                    inside_procedure_arguments = False
-                    expected_indent += procedure_indent
-                if inside_associate_arguments:
-                    inside_associate_arguments = False
-                    expected_indent += loop_conditional_indent
-                if readwrite_argument_line:
-                    readwrite_argument_line = False
-                if readwrite_statement_line:
-                    readwrite_statement_line = False
-                if inside_do_concurrent_range:
-                    inside_do_concurrent_range = False
+                if continuing_quote:
+                    # Quotes continue to next line, don't reset quote tracking
+                    pass
+                else:
+                    open_bracket_count = 0
+                    close_bracket_count = 0
+                    unbalanced_brackets = 0
+                    if continuation_line:
+                        continuation_line = False
+                    if inside_procedure_arguments:
+                        inside_procedure_arguments = False
+                        expected_indent += procedure_indent
+                    if inside_associate_arguments:
+                        inside_associate_arguments = False
+                        expected_indent += loop_conditional_indent
+                    if readwrite_argument_line:
+                        readwrite_argument_line = False
+                    if readwrite_statement_line:
+                        readwrite_statement_line = False
+                    if inside_do_concurrent_range:
+                        inside_do_concurrent_range = False
                     
 
             # Reset from contains line
@@ -438,9 +477,6 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
             ) and \
             not re.match(r'^\s*(function|subroutine|procedure)\s*(,|::)', stripped_line, re.IGNORECASE) and \
             not re.match(r'^\s*procedure\s*(\(|\,)', stripped_line, re.IGNORECASE):
-                    # print(stripped_line)
-                    # print("INTERFACE BLOCK: ", interface_block)
-                    # print(re.match(r'^\s*(integer\s+)', stripped_line, re.IGNORECASE), stripped_line)
                     procedure_depth += 1
                     if stripped_line.lower().endswith("&"):
                         inside_procedure_arguments = True
@@ -538,7 +574,7 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
 
 
     # if not present, add blank line to end of file
-    if corrected_lines[-1].strip():
+    if corrected_lines and corrected_lines[-1].strip():
         corrected_lines.append("")
     return success, "\n".join(corrected_lines)
 
@@ -609,7 +645,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(f"{filename} passed indentation check.")
         else:
             print(f"{filename} failed indentation check.")
-            if args.autofix:
+            if args.autofix and corrected_code is not None:  # Add None check
                 _autofix(filename, corrected_code)
  
     return 0 if success else 1
