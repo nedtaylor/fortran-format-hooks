@@ -468,15 +468,22 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
 
             # Detect procedure blocks, can be "module (function|subroutine|procedure)" or "(function|subroutine|procedure)" but not "procedure(", "procedure," or "procedure ::"
             if re.match(
-                r'^\s*(?:'
-                r'(?:integer|logical|real|complex|character)(?:\s*\([^)]*\))?\s+'
-                r')?(?:elemental\s+|recursive\s+|pure\s+)?(?:module\s+)?(?:recursive\s+)?'
+                r'^\s*'
+                r'(?:(?:pure|elemental|recursive|impure|module|'
+                r'integer|logical|real|complex|character|'
+                r'double\s+precision|doubleprecision|'
+                r'type\s*\([^)]*\)|class\s*\([^)]*\)|'
+                r'integer\s*\([^)]*\)|logical\s*\([^)]*\)|real\s*\([^)]*\)|'
+                r'complex\s*\([^)]*\)|character\s*\([^)]*\)|'
+                r'character\s*\*[^\s,]+)'
+                r'(?:\s*\([^)]*\))?\s+)*'
                 r'(function|subroutine|procedure)\b',
                 stripped_line,
                 re.IGNORECASE
             ) and \
             not re.match(r'^\s*(function|subroutine|procedure)\s*(,|::)', stripped_line, re.IGNORECASE) and \
-            not re.match(r'^\s*procedure\s*(\(|\,)', stripped_line, re.IGNORECASE):
+            not re.match(r'^\s*procedure\s*(\(|\,)', stripped_line, re.IGNORECASE) and \
+            not (interface_block and re.match(r'^\s*module\s+procedure\b', stripped_line, re.IGNORECASE)):
                     procedure_depth += 1
                     if stripped_line.lower().endswith("&"):
                         inside_procedure_arguments = True
