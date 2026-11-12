@@ -293,9 +293,17 @@ def check_indentation(file_path, line_length=80, relaxed_line_margin=0.1):
             # Create a version with comments stripped for analysis
             stripped_line_analysis = processed_line.rstrip()
 
-            # Check if line starts with close bracket, if so, update the indentation
+            # Check if line starts with a close bracket; if so, set the
+            # continuation indentation *before* the indentation check below
+            # consumes continued_indent. A closing bracket aligns one level in
+            # from the innermost open bracket, except when the depth tally is
+            # 0/1 (including procedure/associate argument lists), where it
+            # aligns with expected_indent.
             if re.match(r'^\s*(\)|/\)|\])', stripped_line_analysis):
-                continued_indent = expected_indent + ( unbalanced_brackets - 1 ) * continuation_indent + equality_depth * continuation_indent
+                if unbalanced_brackets <= 1 or inside_procedure_arguments or inside_associate_arguments:
+                    continued_indent = expected_indent
+                else:
+                    continued_indent = expected_indent + ( unbalanced_brackets - 1 ) * continuation_indent + equality_depth * continuation_indent
                 if readwrite_statement_line:
                     continued_indent += continuation_indent
 
